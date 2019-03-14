@@ -139,4 +139,6 @@ add_executable(libevent_2_0_20_stable
         strlcpy-internal.h
         strlcpy.c
         util-internal.h
-        win32select.c)
+        win32select.c
+        config.h
+        config.h.in)

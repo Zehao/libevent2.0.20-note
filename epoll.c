@@ -1,28 +1,5 @@
 /*
- * Copyright 2000-2007 Niels Provos <provos@citi.umich.edu>
- * Copyright 2007-2012 Niels Provos, Nick Mathewson
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * READ
  */
 #include "event2/event-config.h"
 
@@ -52,6 +29,24 @@
 #include "log-internal.h"
 #include "evmap-internal.h"
 #include "changelist-internal.h"
+
+
+
+/**
+ * typedef union epoll_data
+	{
+		void *ptr;
+		int fd;
+		uint32_t u32;
+		uint64_t u64;
+	} epoll_data_t;
+
+	struct epoll_event
+	{
+		uint32_t events;  // Epoll events
+		epoll_data_t data;  // User data variable
+	}
+*/
 
 struct epollop {
 	struct epoll_event *events;
@@ -139,7 +134,7 @@ epoll_init(struct event_base *base)
 	if ((base->flags & EVENT_BASE_FLAG_EPOLL_USE_CHANGELIST) != 0 ||
 	    ((base->flags & EVENT_BASE_FLAG_IGNORE_ENV) == 0 &&
 		evutil_getenv("EVENT_EPOLL_USE_CHANGELIST") != NULL))
-		base->evsel = &epollops_changelist;
+		base->evsel = &epollops_changelist;     // 根据标志动态改变后端，后端对应的数据不变
 
 	evsig_init(base);
 
@@ -191,19 +186,22 @@ epoll_apply_one_change(struct event_base *base,
 
 		/* TODO: Turn this into a switch or a table lookup. */
 
-		if ((ch->read_change & EV_CHANGE_ADD) ||
-		    (ch->write_change & EV_CHANGE_ADD)) {
+		if ((ch->read_change & EV_CHANGE_ADD) || (ch->write_change & EV_CHANGE_ADD))
+		{
 			/* If we are adding anything at all, we'll want to do
 			 * either an ADD or a MOD. */
 			events = 0;
 			op = EPOLL_CTL_ADD;
 			if (ch->read_change & EV_CHANGE_ADD) {
 				events |= EPOLLIN;
-			} else if (ch->read_change & EV_CHANGE_DEL) {
+			}
+			else if (ch->read_change & EV_CHANGE_DEL) {
 				;
-			} else if (ch->old_events & EV_READ) {
+			}
+			else if (ch->old_events & EV_READ) {
 				events |= EPOLLIN;
 			}
+
 			if (ch->write_change & EV_CHANGE_ADD) {
 				events |= EPOLLOUT;
 			} else if (ch->write_change & EV_CHANGE_DEL) {
@@ -231,8 +229,8 @@ epoll_apply_one_change(struct event_base *base,
 				 */
 				op = EPOLL_CTL_MOD;
 			}
-		} else if ((ch->read_change & EV_CHANGE_DEL) ||
-		    (ch->write_change & EV_CHANGE_DEL)) {
+		}
+		else if ((ch->read_change & EV_CHANGE_DEL) || (ch->write_change & EV_CHANGE_DEL)) {
 			/* If we're deleting anything, we'll want to do a MOD
 			 * or a DEL. */
 			op = EPOLL_CTL_DEL;
@@ -357,11 +355,9 @@ epoll_nochangelist_add(struct event_base *base, evutil_socket_t fd,
 	ch.old_events = old;
 	ch.read_change = ch.write_change = 0;
 	if (events & EV_WRITE)
-		ch.write_change = EV_CHANGE_ADD |
-		    (events & EV_ET);
+		ch.write_change = EV_CHANGE_ADD | (events & EV_ET);  // events只能是EV_READ|EV_WRITE|EV_ET, 所以结果可能的情况是 EV_CHANGE_ADD | EV_ET
 	if (events & EV_READ)
-		ch.read_change = EV_CHANGE_ADD |
-		    (events & EV_ET);
+		ch.read_change = EV_CHANGE_ADD | (events & EV_ET);
 
 	return epoll_apply_one_change(base, base->evbase, &ch);
 }
@@ -436,10 +432,10 @@ epoll_dispatch(struct event_base *base, struct timeval *tv)
 		if (!ev)
 			continue;
 
-		evmap_io_active(base, events[i].data.fd, ev | EV_ET);
+		evmap_io_active(base, events[i].data.fd, ev | EV_ET); // MARKUNREAD
 	}
 
-	if (res == epollop->nevents && epollop->nevents < MAX_NEVENT) {
+	if (res == epollop->nevents && epollop->nevents < MAX_NEVENT) {	// 初始时只有32个events，若同时出现事件的fd大于32个，则可能要多次dispatch
 		/* We used all of the event space this time.  We should
 		   be ready for more events next time. */
 		int new_nevents = epollop->nevents * 2;

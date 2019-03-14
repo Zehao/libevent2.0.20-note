@@ -1,29 +1,10 @@
 /*
- * Copyright (c) 2007-2012 Niels Provos and Nick Mathewson
+ * 小根堆实现 写法值得学习
  *
- * Copyright (c) 2006 Maxim Yegorushkin <maxim.yegorushkin@gmail.com>
+ * min_heap_erase 增加了一个删除堆中某个元素的操作
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
+ * 自动扩展数组
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #ifndef _MIN_HEAP_H_
 #define _MIN_HEAP_H_
@@ -135,9 +116,9 @@ void min_heap_shift_up_(min_heap_t* s, unsigned hole_index, struct event* e)
     unsigned parent = (hole_index - 1) / 2;
     while (hole_index && min_heap_elem_greater(s->p[parent], e))
     {
-	(s->p[hole_index] = s->p[parent])->ev_timeout_pos.min_heap_idx = hole_index;
-	hole_index = parent;
-	parent = (hole_index - 1) / 2;
+		(s->p[hole_index] = s->p[parent])->ev_timeout_pos.min_heap_idx = hole_index;
+		hole_index = parent;
+		parent = (hole_index - 1) / 2;
     }
     (s->p[hole_index] = e)->ev_timeout_pos.min_heap_idx = hole_index;
 }
@@ -147,12 +128,12 @@ void min_heap_shift_down_(min_heap_t* s, unsigned hole_index, struct event* e)
     unsigned min_child = 2 * (hole_index + 1);
     while (min_child <= s->n)
 	{
-	min_child -= min_child == s->n || min_heap_elem_greater(s->p[min_child], s->p[min_child - 1]);
-	if (!(min_heap_elem_greater(e, s->p[min_child])))
-	    break;
-	(s->p[hole_index] = s->p[min_child])->ev_timeout_pos.min_heap_idx = hole_index;
-	hole_index = min_child;
-	min_child = 2 * (hole_index + 1);
+		min_child -= min_child == s->n || min_heap_elem_greater(s->p[min_child], s->p[min_child - 1]);
+		if (!(min_heap_elem_greater(e, s->p[min_child])))
+			break;
+		(s->p[hole_index] = s->p[min_child])->ev_timeout_pos.min_heap_idx = hole_index;
+		hole_index = min_child;
+		min_child = 2 * (hole_index + 1);
 	}
     (s->p[hole_index] = e)->ev_timeout_pos.min_heap_idx = hole_index;
 }

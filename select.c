@@ -1,30 +1,13 @@
 /*	$OpenBSD: select.c,v 1.2 2002/06/25 15:50:15 mickey Exp $	*/
 
 /*
- * Copyright 2000-2007 Niels Provos <provos@citi.umich.edu>
- * Copyright 2007-2012 Niels Provos and Nick Mathewson
+ * base->evbase 是一个后端处理模块
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
+ * 每个后端包括自己的数据，对应的都要实现一些函数
+ * 这里是select后端， 数据是selectop， 对应的函数是selectops
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ *
  */
 #include "event2/event-config.h"
 
@@ -69,7 +52,7 @@ typedef unsigned long fd_mask;
 struct selectop {
 	int event_fds;		/* Highest fd in fd set */
 	int event_fdsz;
-	int resize_out_sets;
+	int resize_out_sets;	// read/writeset_in大小改变过，下次select要改变read/writeset_out，
 	fd_set *event_readset_in;
 	fd_set *event_writeset_in;
 	fd_set *event_readset_out;
@@ -110,7 +93,7 @@ select_init(struct event_base *base)
 		return (NULL);
 	}
 
-	evsig_init(base);
+	evsig_init(base);	//MARKUNREAD
 
 	return (sop);
 }
@@ -156,7 +139,7 @@ select_dispatch(struct event_base *base, struct timeval *tv)
 
 	nfds = sop->event_fds+1;
 
-	EVBASE_RELEASE_LOCK(base, th_base_lock);
+	EVBASE_RELEASE_LOCK(base, th_base_lock);	//MARKUNREAD
 
 	res = select(nfds, sop->event_readset_out,
 	    sop->event_writeset_out, NULL, tv);
@@ -177,7 +160,7 @@ select_dispatch(struct event_base *base, struct timeval *tv)
 	event_debug(("%s: select reports %d", __func__, res));
 
 	check_selectop(sop);
-	i = random() % nfds;
+	i = random() % nfds;	// 每次随机一个位置开始active
 	for (j = 0; j < nfds; ++j) {
 		if (++i >= nfds)
 			i = 0;
