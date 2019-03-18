@@ -2,7 +2,7 @@
  *
  * socket的常用标志设置
  * 64位int等的平台无关定义
- * timerval的操作
+ * timeval的操作
  *
  */
 #ifndef _EVENT2_UTIL_H_

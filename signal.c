@@ -160,7 +160,7 @@ evsig_cb(evutil_socket_t fd, short what, void *arg)
 	EVBASE_ACQUIRE_LOCK(base, th_base_lock);
 	for (i = 0; i < NSIG; ++i) {
 		if (ncaught[i])
-			evmap_signal_active(base, i, ncaught[i]);
+			evmap_signal_active(base, i, ncaught[i]);	//MARKUNREAD
 	}
 	EVBASE_RELEASE_LOCK(base, th_base_lock);
 }
