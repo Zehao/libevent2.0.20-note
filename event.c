@@ -1,28 +1,7 @@
 /*
- * Copyright (c) 2000-2007 Niels Provos <provos@citi.umich.edu>
- * Copyright (c) 2007-2012 Niels Provos and Nick Mathewson
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
+ * READ
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "event2/event-config.h"
 
@@ -726,7 +705,7 @@ event_base_free(struct event_base *base)
 		}
 		ev = next;
 	}
-	while ((ev = min_heap_top(&base->timeheap)) != NULL) {
+	while ((ev = min_heap_top(&base->timeheap)) != NULL) {  //eventqueue删除完后剩余的？
 		event_del(ev);
 		++n_deleted;
 	}
@@ -1338,7 +1317,7 @@ event_process_active_single_queue(struct event_base *base,
 			event_signal_closure(base, ev);
 			break;
 		case EV_CLOSURE_PERSIST:
-			event_persist_closure(base, ev);
+			event_persist_closure(base, ev);       // 再次add
 			break;
 		default:
 		case EV_CLOSURE_NONE:
@@ -1417,9 +1396,10 @@ event_process_active(struct event_base *base)
 			if (c < 0) {
 				base->event_running_priority = -1;
 				return -1;
-			} else if (c > 0)
+			} else if (c > 0)		//执行完最高优先级的之后break，等下一次active
 				break; /* Processed a real event; do not
 					* consider lower-priority events */
+
 			/* If we get here, all of the events we processed
 			 * were internal.  Continue. */
 		}
@@ -1578,6 +1558,8 @@ event_base_loop(struct event_base *base, int flags)
 		timeout_correct(base, &tv);
 
 		tv_p = &tv;
+
+		// 没有active的event时，或者不是nonblock时，eventop阻塞等待事件到来
 		if (!N_ACTIVE_CALLBACKS(base) && !(flags & EVLOOP_NONBLOCK)) {
 			timeout_next(base, &tv_p);
 		} else {
@@ -1585,7 +1567,7 @@ event_base_loop(struct event_base *base, int flags)
 			 * if we have active events, we just poll new events
 			 * without waiting.
 			 */
-			evutil_timerclear(&tv);
+			evutil_timerclear(&tv);		// 设置为0，不阻塞
 		}
 
 		/* If we have no events, we just exit */
@@ -1600,6 +1582,7 @@ event_base_loop(struct event_base *base, int flags)
 
 		clear_time_cache(base);
 
+		// eventop dispatch
 		res = evsel->dispatch(base, tv_p);
 
 		if (res == -1) {
@@ -1735,7 +1718,7 @@ event_assign(struct event *ev, struct event_base *base, evutil_socket_t fd, shor
 			    "EV_READ or EV_WRITE", __func__);
 			return -1;
 		}
-		ev->ev_closure = EV_CLOSURE_SIGNAL;
+		ev->ev_closure = EV_CLOSURE_SIGNAL;		//EV_SIGNAL|EV_PERSIST 的标记最后的ev_closure 是EV_CLOSURE_SIGNAL
 	} else {
 		if (events & EV_PERSIST) {
 			evutil_timerclear(&ev->ev_io_timeout);
@@ -2015,8 +1998,7 @@ evthread_notify_base(struct event_base *base)
  * we treat tv as an absolute time, not as an interval to add to the current
  * time */
 static inline int
-event_add_internal(struct event *ev, const struct timeval *tv,
-    int tv_is_absolute)
+event_add_internal(struct event *ev, const struct timeval *tv, int tv_is_absolute)
 {
 	struct event_base *base = ev->ev_base;
 	int res = 0;
@@ -2122,6 +2104,10 @@ event_add_internal(struct event *ev, const struct timeval *tv,
 		gettime(base, &now);
 
 		common_timeout = is_common_timeout(tv, base);
+		/**
+		 *  tv_is_absolute 表示在tv时触发，
+		 *  否则，tv的值表示间隔，ev->ev_timeout 需要加上当前的时间后才表示绝对时间
+		 */
 		if (tv_is_absolute) {
 			ev->ev_timeout = *tv;
 		} else if (common_timeout) {
@@ -2131,7 +2117,7 @@ event_add_internal(struct event *ev, const struct timeval *tv,
 			ev->ev_timeout.tv_usec |=
 			    (tv->tv_usec & ~MICROSECONDS_MASK);
 		} else {
-			evutil_timeradd(&now, tv, &ev->ev_timeout);
+			evutil_timeradd(&now, tv, &ev->ev_timeout);	// 加上当前的时间
 		}
 
 		event_debug((
@@ -2394,7 +2380,7 @@ timeout_next(struct event_base *base, struct timeval **tv_p)
 		goto out;
 	}
 
-	evutil_timersub(&ev->ev_timeout, &now, tv);
+	evutil_timersub(&ev->ev_timeout, &now, tv);	 // 取定时器的最小时间与当前时间的间隔给tv，作为eventop的超时时间。
 
 	EVUTIL_ASSERT(tv->tv_sec >= 0);
 	EVUTIL_ASSERT(tv->tv_usec >= 0);
