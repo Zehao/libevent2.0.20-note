@@ -1,29 +1,5 @@
 /*
- * Copyright (c) 2007-2012 Niels Provos and Nick Mathewson
- * Copyright (c) 2002-2006 Niels Provos <provos@citi.umich.edu>
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * READ
  */
 
 #include <sys/types.h>
@@ -98,6 +74,16 @@ const struct bufferevent_ops bufferevent_ops_socket = {
 #define be_socket_add(ev, t)			\
 	_bufferevent_add_event((ev), (t))
 
+
+/**
+ *  由于写事件会不断触发，所以bufferevent在evbuffer没有数据可写的时候，将fd的写事件event从
+ *  event_base中移除，这样就不会一直触发bufferevent的writecb;
+ *
+ *  但是要把数据发送出去怎么办呢？
+ *  在bufferevent的output evbuffer加一个callback，当output有数据写进去的时候，cb回调发现有数据增加，则
+ *  把fd的写事件event加入到event_base中去，下次循环就会触发写事件了；
+
+ */
 static void
 bufferevent_socket_outbuf_cb(struct evbuffer *buf,
     const struct evbuffer_cb_info *cbinfo,
@@ -279,6 +265,9 @@ bufferevent_writecb(evutil_socket_t fd, short event, void *arg)
 	}
 
 	if (evbuffer_get_length(bufev->output) == 0) {
+		/**
+		 * 若没有数据，则将写事件删除
+		 */
 		event_del(&bufev->ev_write);
 	}
 
@@ -398,7 +387,7 @@ bufferevent_socket_connect(struct bufferevent *bev,
 #endif
 	bufferevent_setfd(bev, fd);
 	if (r == 0) {
-		if (! be_socket_enable(bev, EV_WRITE)) {
+		if (! be_socket_enable(bev, EV_WRITE)) {	// 连接中，监听可写事件，连接成功后会触发可写（肯定的）
 			bufev_p->connecting = 1;
 			result = 0;
 			goto done;
